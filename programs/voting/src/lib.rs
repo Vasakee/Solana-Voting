@@ -25,7 +25,7 @@ pub mod voting {
         Ok(())
     }
 
-    pub fn vote(ctx: Context<Vote>, _poll_id: u64, _candidate_index: u64) -> Result<()> {
+    pub fn vote(ctx: Context<Vote>, _poll_id: u64, _candidate_name: String) -> Result<()> {
         let candidate = &mut ctx.accounts.candidate_account;
         let current_time = Clock::get()?.unix_timestamp;
 
@@ -92,7 +92,7 @@ pub struct InitializeCandidate<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(poll_id: u64, candidate_index: u64)]
+#[instruction(poll_id: u64, candidate_name: String)]
 pub struct Vote<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
@@ -106,7 +106,7 @@ pub struct Vote<'info> {
 
     #[account(
         mut,
-        seeds = [b"candidate".as_ref(), poll_id.to_le_bytes().as_ref(), candidate_index.to_le_bytes().as_ref()],
+        seeds = [b"candidate".as_ref(), poll_id.to_le_bytes().as_ref(), candidate_name.as_bytes().as_ref()],
         bump,
     )]
     pub candidate_account: Account<'info, CandidateAccount>,
