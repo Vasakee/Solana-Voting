@@ -6,8 +6,9 @@ declare_id!("7VpBtEPysH7nWgqwtMH6DDMAWYFZZKpKN9xX2AmJyU1J");
 pub mod voting {
     use super::*;
 
-    pub fn init_poll(ctx: Context<InitPoll>, _poll_id: u64, start: u64, end: u64, name: String, description: String) -> Result<()> {
+    pub fn init_poll(ctx: Context<InitPoll>, poll_id: u64, start: u64, end: u64, name: String, description: String) -> Result<()> {
         let poll = &mut ctx.accounts.poll_account;
+        poll.poll_id = poll_id;
         poll.poll_description = description;
         poll.poll_name = name;
         poll.poll_voting_start = start;
@@ -115,6 +116,7 @@ pub struct Vote<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct PollAccount {
+    pub poll_id: u64,
     #[max_len(32)]
     pub poll_name: String,
     #[max_len(280)]
