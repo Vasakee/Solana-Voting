@@ -5,6 +5,7 @@ import { useVotingProgram } from "@/hooks/useVotingProgram";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import toast from "react-hot-toast";
 
 const PROGRAM_ID = new PublicKey("7VpBtEPysH7nWgqwtMH6DDMAWYFZZKpKN9xX2AmJyU1J");
 
@@ -21,43 +22,38 @@ export function ViewPoll() {
   const { connected } = useWallet();
   const [polls, setPolls] = useState<PollEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState("");
 
   const loadAll = useCallback(async () => {
     if (!connected) return;
     setLoading(true);
-    setStatus("");
     try {
       const program = getProgram();
+      if (!program.account?.pollAccount) {
+        throw new Error("Program account not initialized");
+      }
       const [allPolls, allCandidates] = await Promise.all([
-        program.account.PollAccount.all(),
-        program.account.CandidateAccount.all(),
+        program.account.pollAccount.all(),
+        program.account.candidateAccount.all(),
       ]);
 
       const entries: PollEntry[] = allPolls.map(({ account }) => {
         const pollId = (account.pollId as BN).toNumber();
         const candidates = allCandidates
-          .filter(({ account: c }) => {
-            const expected = PublicKey.findProgramAddressSync(
-              [
-                Buffer.from("candidate"),
-                new BN(pollId).toArrayLike(Buffer, "le", 8),
-                Buffer.from(c.candidateName as string),
-              ],
-              PROGRAM_ID
-            )[0];
-            // verify by re-deriving — if it matches, this candidate belongs to this poll
+          .filter(({ publicKey }) => {
+            // Check if this candidate's PDA matches this poll
             try {
-              return expected.toBase58().length > 0 &&
-                PublicKey.findProgramAddressSync(
-                  [
-                    Buffer.from("candidate"),
-                    new BN(pollId).toArrayLike(Buffer, "le", 8),
-                    Buffer.from(c.candidateName as string),
-                  ],
-                  PROGRAM_ID
-                )[0].equals(expected);
-            } catch { return false; }
+              const [expectedPda] = PublicKey.findProgramAddressSync(
+                [
+                  Buffer.from("candidate"),
+                  new BN(pollId).toArrayLike(Buffer, "le", 8),
+                  Buffer.from((allCandidates.find(c => c.publicKey.equals(publicKey))?.account.candidateName as string) || ""),
+                ],
+                PROGRAM_ID
+              );
+              return expectedPda.equals(publicKey);
+            } catch { 
+              return false; 
+            }
           })
           .map(({ account: c }) => ({
             candidateName: c.candidateName as string,
@@ -74,7 +70,7 @@ export function ViewPoll() {
 
       setPolls(entries);
     } catch (e: unknown) {
-      setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -83,13 +79,13 @@ export function ViewPoll() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const handleVote = async (pollId: number, candidateName: string) => {
-    setStatus(`Voting for ${candidateName}...`);
+    const loadingToast = toast.loading(`Voting for ${candidateName}...`);
     try {
       await vote(pollId, candidateName);
-      setStatus("Vote cast!");
+      toast.success("Vote cast successfully!", { id: loadingToast });
       await loadAll();
     } catch (e: unknown) {
-      setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(e instanceof Error ? e.message : String(e), { id: loadingToast });
     }
   };
 
@@ -129,8 +125,6 @@ export function ViewPoll() {
           </div>
         </div>
       ))}
-
-      {status && <p className="text-sm text-gray-400 mt-1">{status}</p>}
     </div>
   );
 }

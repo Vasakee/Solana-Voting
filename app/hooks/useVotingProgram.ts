@@ -13,7 +13,10 @@ export function useVotingProgram() {
   const wallet = useWallet();
 
   const getProgram = useCallback(() => {
-    const provider = new AnchorProvider(connection, wallet as never, { commitment: "confirmed" });
+    const provider = new AnchorProvider(connection, wallet as never, { 
+      commitment: "confirmed",
+      skipPreflight: false
+    });
     return new Program<Voting>(IDL, provider);
   }, [connection, wallet]);
 
